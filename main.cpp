@@ -2,6 +2,8 @@
 #include <iostream>
 #include <ctime>
 #include  <cstdlib>
+#include <ctime>
+#include    <cstdlib>
 
 using namespace std;
 
@@ -11,7 +13,7 @@ const unsigned int MAX_N = 1e6, MAX_M = 720;
 
 struct point {float x ,y;};
 struct rectangle {struct point a; int w, h;};
-struct line {struct point a, b; float length;};
+struct line {struct point a, b;};
 
 unsigned int WIDTH = 800, HIGTH = 600;
 
@@ -19,6 +21,9 @@ struct line obs[MAX_N];
 struct rectangle player;
 
 unsigned int speed = 4;
+
+
+long long lengths[MAX_M];
 
 float dist(struct line p)
 {
@@ -63,7 +68,26 @@ bool findIntersection(struct line a, struct line b, struct point* result)
     return false;
 }
 
-void move_()
+bool isLineCollding(const struct line *rects, struct line ray, int num_of_rects, struct point *collision, int *index)
+{
+    float best_dist = 99999999;
+    struct point col;
+
+    for(int i = 0;i < num_of_rects;i++)
+        if(findIntersection(rects[i], ray , &col))
+        {
+            if(best_dist > dist({ray.a, col}))
+            {
+                best_dist =  dist({ray.a, col});
+                *collision = col;
+                *index = i;
+            }
+        }
+    return (best_dist == 99999999) ? (false) : (true);
+}
+
+
+void move_player()
 {
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) player.a.x -= speed;
@@ -75,34 +99,39 @@ void move_()
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) player.a.y += speed;
 }
 
-bool isLineCollding(const struct line *rects, struct line ray, int num_of_rects, struct point *collision)
+void generate_maze(int num_of_obs, int min_length, int max_length, struct line *obs)
 {
-    for(int i = 0;i < num_of_rects;i++)
+    for(int i = 0;i < num_of_obs;i++)
     {
-        if(findIntersection(rects[i], ray , collision))
+        struct line curr_line;
+
+        curr_line.a.x = rand() % WIDTH;
+        curr_line.a.y = rand() % HIGTH;
+        do
         {
-           return true;
+            curr_line.b.x = rand() % WIDTH;
+            curr_line.b.y = rand() % HIGTH;
         }
+        while(!(dist(curr_line) >= min_length && dist(curr_line) <= max_length));
+        obs[i] = curr_line;
     }
-    return false;
+
 }
 
 int main()
 {
-    unsigned int n, m, ray_length;
+    srand (static_cast <unsigned> (time(0)));
+
+    unsigned int n, m, ray_length, max_length, min_length;
     cin >> n >> m >> ray_length;
-
-    for(int i = 0;i < n;i++)
-    {
-        obs[i].length = ray_length;
-        cin >> obs[i].a.x >> obs[i].a.y >> obs[i].b.x >> obs[i].b.y;
-    }
-
     cin >> player.a.x >> player.a.y >> player.h >> player.w;
+    cin >> min_length >> max_length;
 
     sf::RenderWindow window(sf::VideoMode(WIDTH, HIGTH), "SFML works!");
 
     float d_angle = 360 / m;
+
+    generate_maze(n, min_length, max_length, obs);
 
     while (window.isOpen())
     {
@@ -114,8 +143,7 @@ int main()
 
             window.clear();
 
-            ///move_player
-            move_();
+            move_player();
 
             ///draw player
             sf::RectangleShape p(sf::Vector2f(player.w, player.h));
@@ -124,36 +152,34 @@ int main()
 
             for(int i = 0;i < m;i++)
             {
+
+                int index;
                 float angle = i*d_angle;
-                struct point b = {cos(angle) * obs[i].length + player.a.x, sin(angle) * obs[i].length + player.a.y}, collision;
+                struct point b = {cos(angle) * lengths[i] + player.a.x, sin(angle) * lengths[i] + player.a.y}, collision;
 
                 struct line curr_ray = {{player.a.x, player.a.y}, b};
 
-                if(isLineCollding(obs, curr_ray, n, &collision))
+                if(isLineCollding(obs, curr_ray, n, &collision, &index))
                 {
-                    obs[i].length = dist({player.a, collision});
                     b = collision;
+
+                    ///draw obs if it s visible
+                    sf::VertexArray q(sf::LinesStrip, 2);
+                    q[0].position = sf::Vector2f(obs[index].a.x, obs[index].a.y);
+                    q[1].position = sf::Vector2f(obs[index].b.x, obs[index].b.y);
+                    window.draw(q);
                 }
                 else
                 {
-                    obs[i].length = ray_length;
+                    lengths[i] = ray_length;
                 }
 
                 ///draw rays
-                sf::VertexArray l(sf::LinesStrip, 2);
+                /*sf::VertexArray l(sf::LinesStrip, 2);
                 l[0].position = sf::Vector2f(player.a.x, player.a.y);
                 l[1].position = sf::Vector2f(b.x, b.y);
-                window.draw(l);
+                window.draw(l);*/
 
-            }
-
-            for(int i = 0;i < n;i++)
-            {
-                sf::VertexArray q(sf::LinesStrip, 2);
-                q[0].position = sf::Vector2f(obs[i].a.x, obs[i].a.y);
-                q[1].position = sf::Vector2f(obs[i].b.x, obs[i].b.y);
-
-                window.draw(q);
             }
             window.display();
         }
@@ -161,20 +187,17 @@ int main()
     return 0;
 }
 
-/**
 
+/**
 1 360 500
 50 50 20 100
 400 400 10 10
 
 vhod
 *********************
-4 360 500
-50 50 50 100
-200 100 100 200
-300 130 400 150
-300 300 400 400
+100 360 500
 500 500 10 10
+60 120
 *********************
 
 108.364 50
